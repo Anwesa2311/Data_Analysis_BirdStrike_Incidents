@@ -1,0 +1,428 @@
+---
+title: "Practicum -  I / Design & Implement a Relational Database "
+Authors: Anwesa Basu (basu.anw@northeastern.edu), Swapnendu Majumdar (majumdar.s@northeastern.edu)
+output: html_notebook
+---
+
+## The assignment
+
+## Installing and Loading Packages
+
+##MySQL on localhost
+
+```{r}
+# 1. Library
+
+if("RMySQL" %in% rownames(installed.packages()) == FALSE) {
+install.packages("RMySQL")
+}
+if("DBI" %in% rownames(installed.packages()) == FALSE) {
+install.packages("DBI")
+}
+if("sqldf" %in% rownames(installed.packages()) == FALSE) {
+install.packages("sqldf")
+}
+if("RMySQL" %in% rownames(installed.packages()) == FALSE) {
+install.packages("RMySQL")
+}
+  
+if("ggplot2" %in% rownames(installed.packages()) == FALSE) {
+install.packages("ggplot2")
+}
+
+library(RMySQL)
+library(DBI)
+library(sqldf)
+library(ggplot2)
+
+#2. Settings
+
+db_user <- 'anwesa2311'
+db_password <- 'anwesa2311'
+db_name <- 'sys'
+db_host <- 'localhost'#'db4free.net'#'127.0.0.1'#'localhost'#'db4free.net'#'LAPTOP-NMMF9RVC'
+db_port <- 3306
+
+#3. read data from db
+
+#dbDisconnect(mydb)
+mydb <- dbConnect(RMySQL::MySQL(), user = db_user, password = db_password, dbname = db_name, host = db_host, port = db_port)
+
+```
+##Solution
+
+```{sql connection=mydb}
+drop table if exists incidents
+```
+```{sql connection=mydb}
+drop table if exists airports
+```
+```{sql connection=mydb}
+drop table if exists conditions
+```
+Creation of table AIRPORTS
+
+```{sql connection=mydb}
+CREATE TABLE IF NOT EXISTS AIRPORTS (
+aid INT NOT NULL AUTO_INCREMENT,
+airportName VARCHAR(100) DEFAULT "unknown",
+airportCode CHAR(3),
+state VARCHAR(40) DEFAULT "unknown",
+PRIMARY KEY ( aid )
+);
+
+```
+Creation of table Conditions
+
+```{sql connection=mydb}
+CREATE TABLE IF NOT EXISTS conditions (
+cid int PRIMARY KEY AUTO_INCREMENT,
+`condition` varchar(25) ,
+explanation varchar(22)
+);
+
+```
+Creation of table incidents
+
+```{sql connection=mydb}
+CREATE TABLE if not exists incidents (
+    iid int  AUTO_INCREMENT,
+    date date,
+    origin int,
+    airline varchar(255) default "unknown" ,
+    aircraft varchar(255) default "unknown",
+    flightPhase varchar(255),
+    impact boolean ,
+    cond int,
+    FOREIGN KEY (origin)
+        REFERENCES airports(aid)
+        ON DELETE CASCADE,
+	 FOREIGN KEY (cond)
+        REFERENCES conditions(cid) 
+        ON DELETE CASCADE,
+        CONSTRAINT CHK_Airline CHECK (`airline` <> 'MILITARY'),
+        PRIMARY KEY(iid)
+);
+
+
+
+```
+```{sql connection=mydb}
+drop trigger if exists before_incidents_insert
+
+```
+This trigger is created to update flightPhase values as per the below requirements.
+
+Harmonize the flight phases to be one of: takeoff, landing, inflight, unknown. For example, for row 14, the flight phase was provided as "Landing Roll" -- change that to "landing" when storing the flightPhase. Code 'approach' as 'landing'; code 'climb' as 'takeoff', etc. Use your judgement as to what the appropriate harmonization is.
+```{sql connection=mydb}
+CREATE TRIGGER before_incidents_insert
+BEFORE INSERT
+ON incidents FOR EACH ROW
+BEGIN
+    IF (new.flightPhase="Landing Roll" or new.flightPhase = "Approach" ) THEN SET new.flightPhase="landing";
+     
+   ELSEIF new.flightPhase='Taxi'or new.flightPhase = "Climb" or new.flightPhase = "Take-off run" THEN
+
+      SET new.flightPhase='takeoff';
+   
+   
+    ELSEIF new.flightPhase = "Descent" THEN
+
+     SET new.flightphase='inflight';
+   
+    ELSE
+
+   SET new.flightPhase='unknown';
+     
+     
+        
+    END IF;
+    
+    end;
+
+
+```
+
+```{r}
+dbSendQuery(mydb, "SET GLOBAL local_infile = true;") 
+birdstrikedata = read.csv("BirdStrikesData.csv")
+
+```
+
+Checking and removing invalid entries
+
+```{r}
+
+
+birdstrikedata = unique(birdstrikedata)
+
+birdstrikedata = subset(birdstrikedata, is.numeric(birdstrikedata$ï..Record.ID))
+
+birdstrikedata = subset(birdstrikedata, birdstrikedata$Aircraft..Airline.Operator!="MILITARY")
+
+#birdstrikedata = subset(birdstrikedata, !is.null(birdstrikedata$FlightDate))
+
+
+```
+
+Mapping all the data to the tables as per the given requirement.
+
+FlightDate ---> incidents.date
+Aircraft: Make/Model ---> incidents.aircraft
+Effect: Indicated Damage ---> incidents.impact
+Conditions: Sky ---> conditions.condition
+When: Phase of flight ---> incidents.flightPhase
+Airport: Name ---> airports.airport
+Origin State ---> airports.state
+Aircraft: Airline/Operator ---> incidents.airline
+
+```{r}
+
+birdstrikedata$FlightDate = as.POSIXct(x = birdstrikedata$FlightDate,
+           format = "%m/%d/%Y %H:%M")
+
+#Conditions: Sky ---> conditions.condition
+conditions = data.frame(condition = birdstrikedata$Conditions..Sky)
+
+conditions = unique(conditions)
+
+dbWriteTable(mydb, value = conditions, name = "conditions", append = TRUE , row.names = FALSE) 
+
+#Airport: Name ---> airports.airport
+airports = data.frame(airportName = birdstrikedata$Airport..Name)
+
+#Origin State ---> airports.state
+airports$state = birdstrikedata$Origin.State
+
+airports = unique(airports)
+
+dbWriteTable(mydb, value = airports, name = "airports", append = TRUE , row.names = FALSE) 
+
+
+#FlightDate ---> incidents.date
+
+incidents = data.frame(date = birdstrikedata$FlightDate)
+
+#Aircraft: Make/Model ---> incidents.aircraft
+incidents$aircraft = birdstrikedata$Aircraft..Make.Model
+
+#Effect: Indicated Damage ---> incidents.impact
+incidents$impact = birdstrikedata$Effect..Impact.to.flight
+
+#When: Phase of flight ---> incidents.flightPhase
+incidents$flightPhase = birdstrikedata$When..Phase.of.flight
+
+#Aircraft: Airline/Operator ---> incidents.airline
+incidents$airline = birdstrikedata$Aircraft..Airline.Operator
+
+#dbWriteTable(mydb, "airports", airports, append = TRUE)
+
+dbWriteTable(mydb, value = incidents, name = "incidents", append = TRUE , row.names = FALSE) 
+
+```
+
+
+Creating reference dataframe.This is a reference dataframe which is created to map the foreign keys of incidents table
+such as aid and cond.This may take some time to run as there are a large number of data to process.
+This may take up to 2-3 mins of total time to run.
+
+```{r}
+
+incidents = dbReadTable(mydb,"incidents")
+
+airports = dbReadTable(mydb,"airports")
+
+conditions = dbReadTable(mydb,"conditions")
+
+birdstrikes_incidents = data.frame(record_id = birdstrikedata$ï..Record.ID)
+
+birdstrikes_incidents$incident_id=incidents$iid
+
+birdstrikes_incidents$airport_name =  birdstrikedata$Airport..Name
+
+birdstrikes_incidents$state = birdstrikedata$Origin.State
+
+
+for (i in seq_len(nrow(birdstrikes_incidents)))
+{
+  for (j in seq_len(nrow(airports)))
+  {
+      if (birdstrikes_incidents$state[i]==airports$state[j] && birdstrikes_incidents$airport_name[i]==airports$airportName[j])
+      {
+        birdstrikes_incidents$aid[i] = airports$aid[j]
+      }
+  }
+}
+
+incidents$origin=birdstrikes_incidents$aid
+
+birdstrikes_incidents$cond = birdstrikedata$Conditions..Sky
+
+for (i in seq_len(nrow(birdstrikes_incidents)))
+{
+  for (j in seq_len(nrow(conditions)))
+  {
+      if (birdstrikes_incidents$cond[i]==conditions$condition[j])
+      {
+        birdstrikes_incidents$cid[i] = conditions$cid[j]
+      }
+  }
+}
+
+
+
+incidents$cond = birdstrikes_incidents$cid
+
+dbWriteTable(mydb, value = incidents, name = "incidents", overwrite = TRUE , row.names = FALSE) 
+
+#dbReadTable(mydb,"incidents")
+```
+5 pts / 1 hr) Show that the loading of the data worked by displaying parts of each table (do not show the entire tables).  Document and explain your decisions. See the Hints below for information on db4free. All data manipulation and importing work must occur in R. You may not modify the original data outside of R -- that would not be reproducible work. It may be helpful to create a subset of the data for development and testing as the full file is quite large and takes time to load.
+
+
+Populating the incidents table record upto 8.
+```{sql connection=mydb}
+SELECT * from incidents limit 8;
+```
+
+Populating the airports table data upto 8.
+```{sql connection=mydb}
+SELECT * from airports limit 8;
+```
+
+Populating the conditions table data upto 8.
+```{sql connection=mydb}
+SELECT * from conditions limit 8;
+```
+
+
+#
+(10 pts / 1 hr) Create a SQL query against your database to find the number of bird strike incidents for each flight phase. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
+
+4.select flightPhase as "Flight Phase",count(iid) as 'Number of bird strike incidents' from incidents group by flightPhase;
+
+```{sql connection=mydb}
+
+select flightPhase as "Flight Phase",count(iid) as 'Number of bird strike incidents' from incidents group by flightPhase;
+
+```
+
+
+(10 pts / 1 hr) Create a SQL query against your database to find the flight phase that had an above average number bird strike incidents (during any flight phase). You may either use a {sql} code chunk or an R function to execute the query. It must be a single query. 
+	
+5.select flightPhase,count(iid)  from incidents group by flightPhase HAVING count(iid)>(select avg(c.count) from (select count(iid) as count,flightPhase as f from incidents group by flightPhase) as c );
+
+```{sql connection=mydb}
+
+select flightPhase,count(iid)  from incidents group by flightPhase HAVING count(iid)>(select avg(c.count) from (select count(iid) as count,flightPhase as f from incidents group by flightPhase) as c );
+
+
+```
+
+
+(10 pts / 1 hr) Create a SQL query against your database to find the average number of bird strike incidents by month (across all years). Include all airlines and all flights. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
+
+6. select sub.m, avg(sub.count) from (select count(iid) as count,month(date) as m,year(date)  from incidents group by 2,3 order by 2,3) as sub group by 1 order by 1;
+
+
+```{sql connection=mydb}
+
+select sub.m, avg(sub.count) from (select count(iid) as count,month(date) as m,year(date)  from incidents group by 2,3 order by 2,3) as sub group by 1 order by 1;
+
+```
+
+
+Build a column chart that visualizes the number of bird strikes incidents per year from 2005 to 2011. Adorn the graph with appropriate axis labels, titles, legend, data labels, etc.
+```{r}
+
+
+CtIncidents = dbFetch(dbSendQuery(mydb,"
+select year(date), flightPhase, count(iid) as count from incidents where year(date) > 2004 and year(date) < 2012 group by 1,2 order by 1,2 ;"))
+
+#barplot(CtIncidents$count, CtIncidents$`year(date)`)
+
+CtIncidents = as.data.frame(CtIncidents)
+
+ggplot(CtIncidents, aes(fill=flightPhase, y=count, x=`year(date)` )) + 
+    geom_bar(position="dodge", stat="identity") + labs(x = "Year of incident") + labs(y = "No. of incidents") +labs(title ="Number of bird strike incidents") +labs(subtitle = "(per year from 2005 to 2011)")+labs(caption = "Image generated using ggplot")
+
+
+
+```
+(10 pts / 3 hrs) Create a stored procedure in MySQL (note that if you used SQLite, then you cannot complete this step) that adds a new bird strike incident to the database. You may decide what you need to pass to the stored procedure to add a bird strike incident and you must account for there being potentially a new airport. After insertion, show (in R) that your procedure worked. Note that if you used SQLite rather than the required MySQL for the practicum, then you cannot complete this question as SQLite does not support stored procedures.
+
+```{sql connection=mydb}
+
+DROP PROCEDURE If exists AddnewIncidents
+
+```
+
+
+```{sql connection=mydb}
+
+CREATE PROCEDURE AddnewIncidents(
+    IN  p_date date, 
+    IN  p_origin int,
+    IN  p_airline varchar(255),
+    IN  p_aircraft varchar(255),
+    IN p_flightPhase varchar(255),
+    IN p_impact boolean,
+    IN p_cond int,
+    IN p_originname VARCHAR(100) ,
+    IN p_origincode CHAR(3),
+    IN p_originstate VARCHAR(40)
+    )
+BEGIN
+    
+    DECLARE p_maxnumber int DEFAULT 0;
+    DECLARE p_maxincident int DEFAULT 0;
+   IF p_origin is null AND p_originname not in (select airports.airportName from airports) and p_originstate not in (select airports.state from airports) THEN
+   INSERT INTO airports (airportName, airportCode, state) values(p_originname,p_origincode,p_originstate);
+   select max(airports.aid)  into p_maxnumber from airports;
+   select max(incidents.iid) into p_maxincident from incidents;
+   INSERT INTO incidents (iid,date, origin, airline, aircraft, flightPhase, impact, cond) values(p_maxincident+1,p_date,p_maxnumber,p_airline,p_aircraft,p_flightPhase,p_impact,p_cond);
+   else
+     select max(incidents.iid) into p_maxincident from incidents;
+    INSERT INTO incidents (iid,date, origin, airline, aircraft, flightPhase, impact, cond) values(p_maxincident+1,p_date,p_origin,p_airline,p_aircraft,p_flightPhase,p_impact,p_cond);
+    END IF;
+END
+
+```
+
+
+calling the stored procedure by passing the necessary parameters. 
+```{sql connection=mydb}
+
+call AddnewIncidents(DATE(now()), 433, "XTRA AIRWAYS", "B-737-400", "landing", TRUE, 2, "SYRACUSE HANCOCK INTL", "SYR","New York");
+
+```
+
+Checking if the data has been inserted properly or not.As it can be seen that we have inserted a new incident with the above given data and that is showing properly in the below result.Here we are inserting an incident with existing airport details.
+```{sql connection=mydb}
+
+select * from incidents where iid = (select max(iid) from incidents);
+
+```
+
+We are testing another scenario with a new airport value.
+```{sql connection=mydb}
+call AddnewIncidents(DATE(now()), null, "AirIndia", "B-737-4009", "landing", TRUE, 2, "Indira Gandhi International Airport", "DEL","DELHI");
+
+```
+As it can be seen that a new row has been added into the airports table with the new information.
+```{sql connection=mydb}
+select * from airports where aid = (select max(aid) from airports);
+```
+Along with the new information in the airports table the new incident has been also recorded in the incidents table as it can be seen in the below result.
+
+```{sql connection=mydb}
+select * from incidents where iid = (select max(iid) from incidents);
+
+```
+
+
+```{r}
+dbDisconnect(mydb)
+
+```
+
