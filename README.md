@@ -47,7 +47,9 @@ Assume "Business" to be an airline name.
 Remove all military flights from the database.
 
 You may either use {sql} code chunks or calls to R functions to execute the SQL statements. 
-(25 pts / 5 hrs) Place the Bird Strikes CSV file into the same folder as your R Notebook and the load it into R without a path name. The default path is the local folder that contains the R Notebook when you have the R Notebook in an R Project. Once loaded, populate the tables with the following subset of data. Use the following column mappings:
+
+## (25 pts / 5 hrs)
+Place the Bird Strikes CSV file into the same folder as your R Notebook and the load it into R without a path name. The default path is the local folder that contains the R Notebook when you have the R Notebook in an R Project. Once loaded, populate the tables with the following subset of data. Use the following column mappings:
 
 FlightDate ---> incidents.date
 Aircraft: Make/Model ---> incidents.aircraft
@@ -59,18 +61,26 @@ Origin State ---> airports.state
 Aircraft: Airline/Operator ---> incidents.airline
 
 Use default values where the data file does not contain values or leave empty. Records (rows) from the CSV that do not have flight information may be omitted. If there is no airport or airline, then link to a "sentinel" airline or airport, i.e., add an "unknown" airline and airport to the tables rather than leaving the value NULL. Assign synthetic key values to aid, iid, and cid and use them as primary keys.
-(5 pts / 1 hr) Show that the loading of the data worked by displaying parts of each table (do not show the entire tables).  Document and explain your decisions. See the Hints below for information on db4free. All data manipulation and importing work must occur in R. You may not modify the original data outside of R -- that would not be reproducible work. It may be helpful to create a subset of the data for development and testing as the full file is quite large and takes time to load.
 
-(10 pts / 1 hr) Create a SQL query against your database to find the number of bird strike incidents for each flight phase. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
+## (5 pts / 1 hr) 
+Show that the loading of the data worked by displaying parts of each table (do not show the entire tables).  Document and explain your decisions. See the Hints below for information on db4free. All data manipulation and importing work must occur in R. You may not modify the original data outside of R -- that would not be reproducible work. It may be helpful to create a subset of the data for development and testing as the full file is quite large and takes time to load.
 
-(10 pts / 1 hr) Create a SQL query against your database to find the flight phase that had an above average number bird strike incidents (during any flight phase). You may either use a {sql} code chunk or an R function to execute the query. It must be a single query. 
+## (10 pts / 1 hr) 
+Create a SQL query against your database to find the number of bird strike incidents for each flight phase. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
 
-(10 pts / 1 hr) Create a SQL query against your database to find the average number of bird strike incidents by month (across all years). Include all airlines and all flights. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
+## 10 pts / 1 hr) 
+Create a SQL query against your database to find the flight phase that had an above average number bird strike incidents (during any flight phase). You may either use a {sql} code chunk or an R function to execute the query. It must be a single query. 
 
-(10 pts / 4 hrs) Build a column chart that visualizes the number of bird strikes incidents per year from 2005 to 2011. Adorn the graph with appropriate axis labels, titles, legend, data labels, etc.
+## (10 pts / 1 hr) 
+Create a SQL query against your database to find the average number of bird strike incidents by month (across all years). Include all airlines and all flights. You may either use a {sql} code chunk or an R function to execute the query. It must be a single query.
 
-(10 pts / 3 hrs) Create a stored procedure in MySQL (note that if you used SQLite, then you cannot complete this step) that adds a new bird strike incident to the database. You may decide what you need to pass to the stored procedure to add a bird strike incident and you must account for there being potentially a new airport. After insertion, show (in R) that your procedure worked. Note that if you used SQLite rather than the required MySQL for the practicum, then you cannot complete this question as SQLite does not support stored procedures.
-Resources
+## (10 pts / 4 hrs) 
+Build a column chart that visualizes the number of bird strikes incidents per year from 2005 to 2011. Adorn the graph with appropriate axis labels, titles, legend, data labels, etc.
+
+## (10 pts / 3 hrs) 
+Create a stored procedure in MySQL (note that if you used SQLite, then you cannot complete this step) that adds a new bird strike incident to the database. You may decide what you need to pass to the stored procedure to add a bird strike incident and you must account for there being potentially a new airport. After insertion, show (in R) that your procedure worked. Note that if you used SQLite rather than the required MySQL for the practicum, then you cannot complete this question as SQLite does not support stored procedures.
+
+## Resources
 [1] Data Visualization - Bird Strike Dataset by H. Haveliwala | data.worldLinks to an external site.
 [2] R Markdown Cheat Sheet
 [3] BirdStrikesData.csvDownload BirdStrikesData.csv
